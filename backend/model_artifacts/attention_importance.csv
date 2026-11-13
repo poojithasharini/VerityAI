@@ -1,0 +1,17 @@
+Feature,Mean_Attention_Weight
+nums/length username,0.16369092
+log_posts,0.15565683
+profile pic,0.13561404
+profile_completeness,0.10572006
+external URL,0.09502564
+log_following,0.07947466
+log_followers,0.057487343
+nums/length fullname,0.041066207
+description length,0.029312355
+follower_following_ratio,0.026665108
+fullname words,0.022825249
+private,0.020991564
+name==username,0.018644333
+#followers,0.01791694
+#follows,0.015410534
+#posts,0.01449818
