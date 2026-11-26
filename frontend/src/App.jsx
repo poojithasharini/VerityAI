@@ -1,6 +1,26 @@
 import React,{useEffect,useState}from"react";import axios from"axios";import{ShieldCheck,BrainCircuit,Database,Activity,ScanSearch,Network,UploadCloud,ChartNoAxesCombined,Fingerprint,ChevronRight,AlertTriangle,CheckCircle2,Menu, X,ArrowUpRight,Zap}from"lucide-react";import{ResponsiveContainer,BarChart,Bar,XAxis,YAxis,Tooltip,CartesianGrid,PieChart,Pie,Cell,Legend}from"recharts";
 const API="/api";
-const initial={dataset:{total:696,train:576,test:120,genuine:348,fake:348},baseline:[{model:"Logistic Regression",accuracy:.9333,f1:.9344,auc:.9853},{model:"Random Forest",accuracy:.95,f1:.9508,auc:.9928},{model:"SVM",accuracy:.9083,f1:.906,auc:.975},{model:"XGBoost",accuracy:.95,f1:.9508,auc:.9928}],hybrid:{accuracy:.8917,precision:.8983,recall:.8833,f1:.8908,auc:.97},ablation:[{combination:"Attention",accuracy:.875},{combination:"Autoencoder",accuracy:.8917},{combination:"GCN",accuracy:.9},{combination:"Attention + Autoencoder",accuracy:.8917},{combination:"Attention + GCN",accuracy:.8917},{combination:"Autoencoder + GCN",accuracy:.9167},{combination:"All three branches",accuracy:.8917}]};
+
+const initial = {
+  dataset: {
+    total: 696,
+    genuine: 348,
+    fake: 348
+  },
+  model_family: "Deep Learning",
+  input_features: 16,
+  fusion_dimension: 73,
+  branches: [
+    { name: "Feature Attention Network", output: "16-dimensional embedding and attention weights" },
+    { name: "Genuine-only Autoencoder", output: "8-dimensional latent vector and anomaly score" },
+    { name: "Graph Convolution Network", output: "16-dimensional graph embedding" },
+    { name: "Hybrid DNN", output: "16-dimensional embedding" },
+    { name: "Hybrid Feature Transformer", output: "16-dimensional embedding" }
+  ],
+  fusion: "73-dimensional representation followed by a 64-32-1 classifier",
+  model_loaded: false
+};
+
 const pct=x=>(x*100).toFixed(2)+"%";
 function App(){const[data,setData]=useState(initial),[page,setPage]=useState("Overview"),[online,setOnline]=useState(false),[form,setForm]=useState({profile_pic:1,username_digit_ratio:.08,fullname_words:2,fullname_digit_ratio:0,name_equals_username:0,description_length:85,external_url:0,private:0,posts:24,followers:420,follows:310}),[result,setResult]=useState(null),[file,setFile]=useState(null),[upload,setUpload]=useState(null),[busy,setBusy]=useState(false),[mobile,setMobile]=useState(false);
 useEffect(()=>{let active=true;axios.get(API+"/health").then(r=>{if(active)setOnline(r.status===200);}).catch(err=>{console.error("Backend health check failed:",err.message,err.response?.data);if(active)setOnline(false);});axios.get(API+"/summary").then(r=>{if(active)setData(r.data);}).catch(err=>console.error("Summary request failed:",err.message,err.response?.data));return()=>{active=false;};},[]);
@@ -31,12 +51,241 @@ const doUpload=async e=>{e.preventDefault();if(!file)return;setBusy(true);let f=
 const field=(key,label,type="number")=><label className="field"><span>{label}</span>{type==="select"?<select value={form[key]} onChange={e=>setForm({...form,[key]:+e.target.value})}><option value="0">No</option><option value="1">Yes</option></select>:<input type="number" value={form[key]} onChange={e=>setForm({...form,[key]:+e.target.value})}/>}</label>;
 return <div className="shell"><aside className={mobile?"side open":"side"}><div className="brand"><div className="logo"><Fingerprint/></div><div><b>VERITY<span>AI</span></b><small>PROFILE INTELLIGENCE</small></div><button className="close" onClick={()=>setMobile(false)}><X/></button></div><div className="workspace">● &nbsp;Research workspace <span>⌄</span></div><small className="navcap">WORKSPACE</small>{nav.slice(0,3).map(([n,I])=><button key={n} className={page===n?"nav active":"nav"} onClick={()=>{setPage(n);setMobile(false)}}><I size={17}/>{n}</button>)}<small className="navcap">RESEARCH</small>{nav.slice(3).map(([n,I])=><button key={n} className={page===n?"nav active":"nav"} onClick={()=>{setPage(n);setMobile(false)}}><I size={17}/>{n}</button>)}<div className="sidefoot"><div className="status"><small>PROJECT STATUS</small><b>Research prototype <i>●</i></b><div className="track"><i/></div><span>Notebook experiments completed</span></div><div className="team"><div>DS</div><span><b>Data Science Team</b><small>SR University</small></span></div></div></aside>
 <main><header><button className="hamb" onClick={()=>setMobile(true)}><Menu/></button><div className="crumb">Workspace　/　<b>{page}</b></div><div className="right"><span className={online?"online":"offline"}>● {online?"API CONNECTED":"API OFFLINE"}</span><div className="user">DS</div></div></header><section className="content">
-{page==="Overview"&&<><div className="hero"><div className="kicker">● INTELLIGENT SOCIAL PROFILE ANALYTICS</div><h1>See beyond the<br/><em>profile.</em></h1><p>A hybrid intelligence framework for identifying suspicious social profiles through feature attention, anomaly detection and graph learning.</p><button className="cta" onClick={()=>setPage("Profile Analyzer")}> <ScanSearch size={16}/> Analyze a profile <ArrowUpRight size={15}/></button><div className="orb"><Fingerprint size={58}/><span>AI</span></div></div><div className="heading"><div><small>RESEARCH SNAPSHOT / 01</small><h2>Project at a glance</h2><p>Recorded experimental results from the Google Colab notebook.</p></div><b className="pill">EXPERIMENT COMPLETED</b></div><div className="metrics">{[[Database,"696","Profiles analyzed","Balanced labelled dataset"],[ShieldCheck,"95.00%","Best baseline accuracy","Random Forest / XGBoost"],[BrainCircuit,"89.17%","Hybrid accuracy","Three-branch fusion"],[Activity,"0.9700","Hybrid ROC-AUC","Recorded test split"]].map(([I,v,t,s])=><div className="metric"><div><span>{t}</span><I/></div><b>{v}</b><small>{s}</small></div>)}</div><div className="charts"><div className="panel"><h3>Baseline model comparison</h3><p>Accuracy · supplied test partition</p><ResponsiveContainer width="100%" height={240}><BarChart data={data.baseline}><CartesianGrid stroke="#26364a" vertical={false}/><XAxis dataKey="model" tick={{fill:"#91a1b5",fontSize:10}}/><YAxis domain={[0,1]} tick={{fill:"#91a1b5",fontSize:10}}/><Tooltip contentStyle={{background:"#101b2b",border:"1px solid #30435b"}}/><Bar dataKey="accuracy" fill="#42d9b6" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div><div className="panel"><h3>Dataset composition</h3><p>696 labelled profile records</p><ResponsiveContainer width="100%" height={240}><PieChart><Pie data={[{name:"Genuine",value:348},{name:"Fake",value:348}]} dataKey="value" innerRadius={62} outerRadius={88}>{[0,1].map((x)=><Cell fill={x?"#858bff":"#42d9b6"}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div></div><div className="insight"><b>Research insight</b><p>Classical Random Forest and XGBoost outperformed the full hybrid model on this dataset split. The hybrid approach adds multiple representation and explainability views, rather than higher measured accuracy.</p></div></>}
+{page==="Overview"&&<><div className="hero"><div className="kicker">● INTELLIGENT SOCIAL PROFILE ANALYTICS</div><h1>See beyond the<br/><em>profile.</em></h1><p>A hybrid intelligence framework for identifying suspicious social profiles through feature attention, anomaly detection and graph learning.</p><button className="cta" onClick={()=>setPage("Profile Analyzer")}> <ScanSearch size={16}/> Analyze a profile <ArrowUpRight size={15}/></button><div className="orb"><Fingerprint size={58}/><span>AI</span></div></div><div className="heading"><div><small>RESEARCH SNAPSHOT / 01</small><h2>Project at a glance</h2><p>Recorded experimental results from the Google Colab notebook.</p></div><b className="pill">EXPERIMENT COMPLETED</b></div>
+<div className="metrics">
+  {[
+    [Database, "696", "Dataset profiles", "348 genuine · 348 fake"],
+    [Activity, "16", "Input features", "Standardized profile features"],
+    [BrainCircuit, "05", "DL branches", "Five complementary branches"],
+    [Network, "73", "Fusion dimensions", "Combined branch representation"]
+  ].map(([I, v, t, s]) => (
+    <div className="metric" key={t}>
+      <div><span>{t}</span><I /></div>
+      <b>{v}</b>
+      <small>{s}</small>
+    </div>
+  ))}
+</div>
+
+<div className="charts">
+  <div className="panel">
+    <h3>Five-branch deep learning architecture</h3>
+    <p>Complementary representations combined by the fusion classifier.</p>
+    {initial.branches.map((branch, i) => (
+      <div className="evidence" key={branch.name}>
+        <CheckCircle2 size={16} />
+        <span><b>{String(i + 1).padStart(2, "0")} · {branch.name}</b><br />
+        {branch.output}</span>
+      </div>
+    ))}
+  </div>
+
+  <div className="panel">
+    <h3>Dataset composition</h3>
+    <p>696 labelled profile records</p>
+    <ResponsiveContainer width="100%" height={240}>
+      <PieChart>
+        <Pie
+          data={[
+            { name: "Genuine", value: 348 },
+            { name: "Fake", value: 348 }
+          ]}
+          dataKey="value"
+          innerRadius={62}
+          outerRadius={88}
+        >
+          {[0, 1].map(x => (
+            <Cell key={x} fill={x ? "#858bff" : "#42d9b6"} />
+          ))}
+        </Pie>
+        <Tooltip />
+        <Legend />
+      </PieChart>
+    </ResponsiveContainer>
+  </div>
+</div>
+
+<div className="insight">
+  <b>Research architecture</b>
+  <p>
+    VerityAI combines feature attention, genuine-profile anomaly detection,
+    graph learning, a hybrid DNN and a feature transformer.
+    Their representations are concatenated into a 73-dimensional vector
+    for final classification.
+  </p>
+</div>
+</>}
+
 {page==="Profile Analyzer"&&<><div className="heading"><div><small>INTERACTIVE WORKSPACE / 02</small><h2>Profile analyzer</h2><p>Analyze profile characteristics using the trained hybrid deep learning model.</p>
 </div></div><div className="two"><div className="panel"><h3>Profile attributes</h3><p>Enter the profile characteristics to generate an assessment using the trained hybrid model.</p><form onSubmit={predict} className="fields">{field("profile_pic","Profile picture present","select")}{field("username_digit_ratio","Username digit ratio")}{field("fullname_words","Full name words")}{field("fullname_digit_ratio","Full name digit ratio")}{field("name_equals_username","Name equals username","select")}{field("description_length","Bio description length")}{field("external_url","External URL","select")}{field("private","Private account","select")}{field("posts","Number of posts")}{field("followers","Number of followers")}{field("follows","Number of accounts followed")}<button className="cta wide" disabled={busy}><Zap size={16}/> {busy?"Analyzing...":"Analyze profile"}</button></form></div><div className="panel"><h3>Analysis output</h3>{!result?<div className="empty"><Fingerprint size={42}/><b>Awaiting profile input</b><p>Complete the profile attributes and select Analyze profile to view the model output.</p></div>:result.error?<div className="empty"><AlertTriangle size={32}/><b>{result.label}</b><p>{result.message}</p></div>:<div className="prediction"><b className="pill">{result.mode || "MODEL RESULT"}</b><div className="score">{(Number(result.score)*100).toFixed(1)}<small>%</small></div><h2>{result.label}</h2><p>Estimated fake-profile likelihood produced by the trained hybrid model.</p><div className="result-meta"><span>Risk level</span><strong>{result.risk_band || "Not available"}</strong></div><div className="result-meta"><span>Manual review</span><strong>{result.manual_review ? "Recommended" : "Not indicated"}</strong></div><h4>Signals identified</h4>{(result.evidence || []).map((x,i)=><div className="evidence" key={i}><CheckCircle2 size={15}/>{x}</div>)}<p className="subtle-note">This is a research model estimate based on the entered profile attributes, not independent verification of an Instagram account.</p></div>}</div></div></>}
 {page==="Dataset Lab"&&<><div className="heading"><div><small>DATA MANAGEMENT / 03</small><h2>Dataset lab</h2><p>Upload a CSV to inspect its schema and data quality.</p></div></div><div className="two"><div className="panel"><h3><UploadCloud/> Upload dataset CSV</h3><p>Files are processed in memory and not stored permanently.</p><form onSubmit={doUpload}><label className="drop"><input type="file" accept=".csv" onChange={e=>setFile(e.target.files[0])}/><UploadCloud size={32}/><b>{file?file.name:"Choose a CSV file"}</b><small>Click to browse</small></label><button className="cta wide" disabled={!file||busy}>{busy?"Inspecting...":"Inspect CSV"}</button></form>{upload?.error&&<div className="warning">{upload.error}</div>}{upload&&!upload.error&&<div className="success">✓ {upload.message}</div>}</div><div className="panel"><h3>Notebook data audit</h3>{["11 original predictors + target","No missing values in supplied CSVs","Balanced 50 / 50 class distribution","2 duplicate rows in each CSV; retained","Follower count is highly skewed"].map((x,i)=><div className="evidence" key={i}><CheckCircle2 size={16}/>{x}</div>)}</div></div>{upload&&!upload.error&&<div className="panel"><h3>Uploaded file inspection</h3><div className="stats">{[["Rows",upload.rows],["Columns",upload.columns.length],["Missing cells",upload.missing_values],["Duplicates",upload.duplicate_rows]].map(([k,v])=><div><b>{v}</b><small>{k}</small></div>)}</div><div className="tablewrap"><table><thead><tr>{upload.columns.map(c=><th key={c}>{c}</th>)}</tr></thead><tbody>{upload.preview.map((r,i)=><tr key={i}>{upload.columns.map(c=><td key={c}>{String(r[c]??"—")}</td>)}</tr>)}</tbody></table></div></div>}</>}
-{page==="Model Performance"&&<><div className="heading"><div><small>EXPERIMENTAL RESULTS / 04</small><h2>Model performance</h2><p>Recorded comparison of classical baselines and hybrid experiments.</p></div></div><div className="panel"><h3>Baseline metrics</h3><div className="tablewrap"><table><thead><tr>{["Model","Accuracy","Precision","Recall","F1","ROC-AUC"].map(x=><th>{x}</th>)}</tr></thead><tbody>{data.baseline.map(r=><tr key={r.model}><td>{r.model}</td><td>{pct(r.accuracy)}</td><td>{pct(r.precision)}</td><td>{pct(r.recall)}</td><td>{pct(r.f1)}</td><td>{r.auc.toFixed(4)}</td></tr>)}<tr><td>Hybrid Fusion</td><td>{pct(data.hybrid.accuracy)}</td><td>{pct(data.hybrid.precision)}</td><td>{pct(data.hybrid.recall)}</td><td>{pct(data.hybrid.f1)}</td><td>{data.hybrid.auc.toFixed(4)}</td></tr></tbody></table></div></div><div className="panel"><h3>Fusion-level ablation study</h3><p>Branch encoders frozen</p>{data.ablation.map(r=><div className="abrow" key={r.combination}><span>{r.combination}</span><div className="bar"><i style={{width:r.accuracy*100+"%"}}/></div><b>{pct(r.accuracy)}</b></div>)}</div><div className="warning"><AlertTriangle/>The hybrid model did not outperform the strongest classical baselines. Ablation is fusion-head-level, not full branch retraining.</div></>}
-{page==="Hybrid Architecture"&&<><div className="heading"><div><small>MODEL DESIGN / 05</small><h2>Hybrid architecture</h2><p>Three complementary branches converge into a 41-dimensional fusion classifier.</p></div></div><div className="archinput">INPUT · 16 STANDARDIZED PROFILE FEATURES</div><div className="branches">{[["01","FEATURE ATTENTION NETWORK","Learns per-profile feature importance.","16 input → attention scoring → feature weighting → 16→32→16 encoder","16-D embedding + attention weights"],["02","GENUINE-ONLY AUTOENCODER","Learns genuine-profile patterns and detects unusual inputs.","16→24→8 encoder → latent representation → 8→24→16 decoder","8-D latent vector + anomaly score"],["03","GRAPH CONVOLUTION NETWORK","Learns from neighbouring profile records in a similarity graph.","KNN graph K=5 → two graph convolution layers → neighbour aggregation","16-D graph embedding"]].map(x=><div className="panel branch"><small>BRANCH {x[0]}</small><h3>{x[1]}</h3><p>{x[2]}</p><div>{x[3]}</div><b>OUTPUT: {x[4]}</b></div>)}</div><div className="fusion"><small>FUSION CLASSIFIER</small><h2>16 + 8 + 1 + 16 = 41 dimensions</h2><p>Dense layers: 41 → 32 → 16 → 1</p><b>FINAL FAKE-PROFILE PROBABILITY</b></div><div className="warning"><AlertTriangle/>The graph included fit, validation and test feature vectors in graph construction. Test labels were withheld from supervised training. This is a transductive setup.</div></>}
-{page==="Explainability"&&<><div className="heading"><div><small>MODEL INTERPRETABILITY / 06</small><h2>Explainability studio</h2><p>Evidence views help inspect model behaviour; they do not prove account authenticity.</p></div></div><div className="two"><div className="panel"><h3>Mean attention weights</h3>{[["Username digit ratio",16.37],["Log posts",15.57],["Profile picture",13.56],["Profile completeness",10.57],["External URL",9.5]].map(([n,v])=><div className="weight" key={n}><span>{n}</span><b>{v}%</b><i><em style={{width:v/18*100+"%"}}/></i></div>)}<small>Attention weights are learned model weighting, not causal evidence.</small></div><div className="panel"><h3>Autoencoder anomaly signal</h3><div className="stats"><div><b>1.4776</b><small>95th percentile threshold</small></div><div><b>18 / 120</b><small>Test profiles flagged</small></div></div><p>Trained only on genuine fit profiles. Higher reconstruction error indicates an input less similar to learned genuine patterns.</p></div></div><div className="panel"><h3>Case review · Test_Profile_1 <b className="pill red">FALSE POSITIVE</b></h3><div className="stats"><div><b>0.9931</b><small>Hybrid fake probability</small></div><div><b>FAKE</b><small>Predicted label</small></div><div><b>GENUINE</b><small>Actual label</small></div><div><b>2.4874</b><small>Reconstruction error</small></div></div><div className="warning"><AlertTriangle/>A high-confidence false positive. Agreement between model branches does not guarantee correctness. Human review is essential.</div></div><div className="panel"><h3>Methods used</h3><div className="methods"><div><b>SHAP TreeExplainer</b><p>Feature contributions for the Random Forest baseline.</p></div><div><b>SHAP KernelExplainer</b><p>Explanations over the 41-dimensional fused representation for selected test samples.</p></div><div><b>Attention weights</b><p>Relative feature weighting learned by the attention branch.</p></div><div><b>Nearest neighbours</b><p>Closest fit records in standardized feature space, not real social relationships.</p></div></div></div></>}
+
+{page === "Model Performance" && <>
+  <div className="heading">
+    <div>
+      <small>DEEP LEARNING RESULTS / 04</small>
+      <h2>Model performance</h2>
+      <p>Evaluation workspace for the five-branch deep-learning model.</p>
+    </div>
+  </div>
+
+  <div className="panel">
+    <h3>Five-branch model configuration</h3>
+    <div className="stats">
+      <div><b>05</b><small>DL branches</small></div>
+      <div><b>16</b><small>Input features</small></div>
+      <div><b>73</b><small>Fusion dimensions</small></div>
+      <div><b>64–32–1</b><small>Fusion classifier</small></div>
+    </div>
+  </div>
+
+  <div className="panel">
+    <h3>Deep-learning components</h3>
+    {initial.branches.map((branch, i) => (
+      <div className="evidence" key={branch.name}>
+        <CheckCircle2 size={16}/>
+        <span>
+          <b>Branch {i + 1}: {branch.name}</b><br/>
+          {branch.output}
+        </span>
+      </div>
+    ))}
+  </div>
+
+
+</>}
+
+
+{page === "Hybrid Architecture" && <>
+  <div className="heading">
+    <div>
+      <small>MODEL DESIGN / 05</small>
+      <h2>Hybrid deep learning architecture</h2>
+      <p>Five complementary branches converge into a 73-dimensional fusion classifier.</p>
+    </div>
+  </div>
+
+  <div className="archinput">
+    INPUT · 16 STANDARDIZED PROFILE FEATURES
+  </div>
+
+  <div className="branches">
+    {[
+      ["01", "FEATURE ATTENTION NETWORK",
+       "Learns the importance of individual profile features.",
+       "16 input → attention scoring → feature weighting → 16→32→16 encoder",
+       "16-D embedding + attention weights"],
+
+      ["02", "GENUINE-ONLY AUTOENCODER",
+       "Learns genuine-profile patterns and identifies unusual inputs.",
+       "16→24→8 encoder → latent representation → 8→24→16 decoder",
+       "8-D latent vector + anomaly score"],
+
+      ["03", "GRAPH CONVOLUTION NETWORK",
+       "Learns representations using neighbouring profiles in a similarity graph.",
+       "KNN graph K=5 → two graph convolution layers → neighbour aggregation",
+       "16-D graph embedding"],
+
+      ["04", "HYBRID DNN",
+       "Learns nonlinear patterns from the standardized profile features.",
+       "16→64→32→16 encoder",
+       "16-D embedding"],
+
+      ["05", "HYBRID FEATURE TRANSFORMER",
+       "Learns relationships between profile features using transformer layers.",
+       "16 feature tokens → 32-D representation → transformer encoder → 16-D projection",
+       "16-D embedding"]
+    ].map(x => (
+      <div className="panel branch" key={x[0]}>
+        <small>BRANCH {x[0]}</small>
+        <h3>{x[1]}</h3>
+        <p>{x[2]}</p>
+        <div>{x[3]}</div>
+        <b>OUTPUT: {x[4]}</b>
+      </div>
+    ))}
+  </div>
+
+  <div className="fusion">
+    <small>FIVE-BRANCH FUSION CLASSIFIER</small>
+    <h2>16 + 8 + 1 + 16 + 16 + 16 = 73 dimensions</h2>
+    <p>Dense layers: 73 → 64 → 32 → 1</p>
+    <b>FINAL FAKE-PROFILE PROBABILITY</b>
+  </div>
+
+
+</>}
+
+
+{page === "Explainability" && <>
+  <div className="heading">
+    <div>
+      <small>MODEL INTERPRETABILITY / 06</small>
+      <h2>Explainability studio</h2>
+      <p>Inspect the signals produced by the five-branch deep-learning model.</p>
+    </div>
+  </div>
+
+  <div className="two">
+    <div className="panel">
+      <h3>Feature attention</h3>
+      <p>
+        The Feature Attention Network assigns relative weights
+        to the 16 standardized input features.
+      </p>
+      <div className="evidence">
+        <BrainCircuit size={17}/>
+        Attention weights are available for individual predictions
+        through the prediction API.
+      </div>
+      <p className="subtle-note">
+        Attention weights indicate model emphasis, not causal evidence.
+      </p>
+    </div>
+
+    <div className="panel">
+      <h3>Autoencoder anomaly detection</h3>
+      <p>
+        The genuine-only autoencoder learns to reconstruct
+        genuine-profile patterns.
+      </p>
+      <div className="evidence">
+        <Activity size={17}/>
+        Reconstruction error is used as an anomaly signal.
+      </div>
+      <p className="subtle-note">
+        A high reconstruction error does not independently prove
+        that a profile is fake.
+      </p>
+    </div>
+  </div>
+
+  <div className="panel">
+    <h3>Five-branch prediction evidence</h3>
+    {[
+      "Feature Attention Network — attention weights and embedding",
+      "Genuine-only Autoencoder — latent representation and reconstruction error",
+      "Graph Convolution Network — graph-based embedding",
+      "Hybrid DNN — learned nonlinear representation",
+      "Hybrid Feature Transformer — transformer-based representation"
+    ].map((item, i) => (
+      <div className="evidence" key={i}>
+        <CheckCircle2 size={16}/>
+        {item}
+      </div>
+    ))}
+  </div>
+
+  <div className="panel">
+    <h3>Prediction-level explainability</h3>
+    <p>
+      Submit a profile in the Profile Analyzer to inspect its
+      attention weights, anomaly score, branch probabilities,
+      branch disagreement and nearest feature-space neighbours.
+    </p>
+
+  </div>
+</>}
+
 </section><footer>VERITYAI · RESEARCH PROTOTYPE <span>SR UNIVERSITY · CSE (DATA SCIENCE) · v1.0</span></footer></main></div>}
 export default App;
